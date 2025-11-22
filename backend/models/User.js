@@ -8,7 +8,10 @@ const UserSchema = new Schema({
   passwordHash: String,
   salt: String,
   avatar: String,
-  phone: { type: Number, default: null } 
+  phone: { type: Number, default: null },
+  role: { type: String, enum: ['user', 'admin', 'superadmin'], default: 'user' },
+  isBlocked: { type: Boolean, default: false },
+  tokenVersion: { type: Number, default: 0 } 
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', UserSchema);

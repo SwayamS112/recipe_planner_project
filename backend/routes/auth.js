@@ -36,14 +36,19 @@ router.post('/signup', upload.single('avatar'), async (req, res) => {
       passwordHash: hash,
       salt,
       avatar: avatarUrl,
-      phone: null
+      phone: null,
+      role: 'user' // explicitly set default role
     });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user._id, role: user.role, tokenVersion: user.tokenVersion },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, phone: user.phone }
+      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, phone: user.phone, role: user.role }
     });
   } catch (e) {
     console.error(e);
@@ -58,21 +63,26 @@ router.post('/login', async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(400).json({ error: 'Invalid credentials' });
 
+    if (user.isBlocked) return res.status(403).json({ error: 'Account blocked' });
+
     const { hash } = hashPassword(password, user.salt);
     if (hash !== user.passwordHash) return res.status(400).json({ error: 'Invalid credentials' });
 
-    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign(
+      { id: user._id, role: user.role, tokenVersion: user.tokenVersion },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
 
     res.json({
       token,
-      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, phone: user.phone }
+      user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, phone: user.phone, role: user.role }
     });
   } catch (e) {
     console.error(e);
     res.status(400).json({ error: e.message });
   }
 });
-
 // GET current user
 router.get('/me', auth, async (req, res) => {
   try {

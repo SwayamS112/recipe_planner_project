@@ -129,8 +129,9 @@ router.put(
       const recipe = await Recipe.findById(req.params.id);
 
       if (!recipe) return res.status(404).json({ message: "Not found" });
-      if (recipe.user.toString() !== req.userId)
-        return res.status(401).json({ message: "Not authorized" });
+      if (String(recipe.user) !== String(req.userId))
+  return res.status(401).json({ message: "Not authorized" });
+
 
       if (title) recipe.title = title;
       if (description) recipe.description = description;
@@ -166,8 +167,8 @@ router.delete("/:id", jwtAuth, async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
     if (!recipe) return res.status(404).json({ message: "Not found" });
-    if (recipe.user.toString() !== req.userId)
-      return res.status(401).json({ message: "Not authorized" });
+   if (String(recipe.user) !== String(req.userId))
+  return res.status(401).json({ message: "Not authorized" });
 
     await recipe.deleteOne();
     res.json({ message: "Deleted" });
