@@ -24,13 +24,23 @@ export default function AddRecipe() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const fd = new FormData();
-    fd.append("title", title);
-    fd.append("description", description);
-    fd.append("ingredients", JSON.stringify(ingredients));
-    if (image) fd.append("image", image);
-    if (video) fd.append("video", video);
-    fd.append("isPublic", isPublic);
+
+     const fd = new FormData();
+  fd.append("title", title);
+  fd.append("description", description);
+  fd.append("ingredients", JSON.stringify(ingredientsArray));
+  fd.append("steps", JSON.stringify(stepsArray));
+  fd.append("isPublic", isPublic);
+
+    // images (multiple)
+  for (const file of imageFiles) {
+    fd.append("images", file); 
+  }
+
+   // optional: video
+  if (videoFile) {
+    fd.append("video", videoFile);
+  }
 
     try {
       await api.post("/recipes", fd, {

@@ -4,14 +4,13 @@ const router = express.Router();
 const Recipe = require("../models/Recipe");
 const multer = require("multer");
 const jwtAuth = require('../middleware/auth');
-const cloudinary = require('../utils/cloudinary'); // use configured instance
-const requireRole = require('../middleware/roles');
+const cloudinary = require('../utils/cloudinary');
 
-// Multer memory storage (no local file saving)
+// Multer memory storage
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
-// Helper function to upload to Cloudinary
+// helper: upload buffer to cloudinary
 const uploadToCloudinary = async (buffer, folder, resourceType = "image") => {
   return new Promise((resolve, reject) => {
     cloudinary.uploader
@@ -26,144 +25,198 @@ const uploadToCloudinary = async (buffer, folder, resourceType = "image") => {
   });
 };
 
-// CREATE Recipe (POST)
+// safe parser for arrays (stringified JSON or array)
+function safeParseArray(input) {
+  if (typeof input === "undefined" || input === null) return undefined;
+  if (Array.isArray(input)) return input;
+  if (typeof input === "string") {
+    if (input.trim() === "") return [];
+    try {
+      const parsed = JSON.parse(input);
+      return Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e) {
+      return { __parseError: true, raw: input };
+    }
+  }
+  return undefined;
+}
+
+// CREATE Recipe (supports multiple images under `images`)
 router.post(
   "/",
   jwtAuth,
-  upload.fields([{ name: "image" }, { name: "video" }]),
+  upload.fields([{ name: "images" }, { name: "image" }, { name: "video" }]),
   async (req, res) => {
     try {
-      const { title, description, ingredients, isPublic } = req.body;
-      let imageUrl = "";
-      let videoUrl = "";
+      const { title, description, ingredients, steps, isPublic } = req.body;
 
-      // upload image to cloudinary
-      if (req.files && req.files.image) {
-        imageUrl = await uploadToCloudinary(
-          req.files.image[0].buffer,
-          "recipes/images",
-          "image"
-        );
+      const imagesArr = [];
+
+      if (req.files && req.files.images && req.files.images.length) {
+        for (const f of req.files.images) {
+          const url = await uploadToCloudinary(f.buffer, "recipes/images", "image");
+          imagesArr.push(url);
+        }
       }
 
-      // upload video to cloudinary
-      if (req.files && req.files.video) {
-        videoUrl = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          "recipes/videos",
-          "video"
-        );
+      if (req.files && req.files.image && req.files.image[0]) {
+        const url = await uploadToCloudinary(req.files.image[0].buffer, "recipes/images", "image");
+        imagesArr.push(url);
+      }
+
+      let videoUrl = "";
+      if (req.files && req.files.video && req.files.video[0]) {
+        videoUrl = await uploadToCloudinary(req.files.video[0].buffer, "recipes/videos", "video");
       }
 
       const newRecipe = new Recipe({
         user: req.userId,
         title,
         description,
-        ingredients: JSON.parse(ingredients || "[]"),
-        image: imageUrl,
+        ingredients: safeParseArray(ingredients) || [],
+        steps: safeParseArray(steps) || [],
+        images: imagesArr,
+        image: imagesArr[0] || "",
         video: videoUrl,
         isPublic: isPublic === "true" || isPublic === true,
       });
 
-      await newRecipe.save();
-      res.status(201).json(newRecipe);
+      const saved = await newRecipe.save();
+      await saved.populate("user", "name avatar");
+      res.status(201).json(saved);
     } catch (error) {
-      console.error(error);
-      res.status(500).json({ message: "Server error" });
+      console.error("Error creating recipe:", error && error.stack ? error.stack : error);
+      res.status(500).json({ message: "Server error while creating recipe" });
     }
   }
 );
 
-
-// GET all public recipes (social feed)
+// GET public (newest first)
 router.get("/public", async (req, res) => {
   try {
     const publicRecipes = await Recipe.find({ isPublic: true })
       .populate("user", "name avatar")
+      .sort({ createdAt: -1 })
       .lean();
 
     const sanitized = publicRecipes.map((r) => ({
       ...r,
-      image: r.image || "",
+      images: r.images || (r.image ? [r.image] : []),
+      image: r.image || (r.images && r.images[0]) || "",
       video: r.video || "",
       user: r.user || { name: "Unknown", avatar: "" }
     }));
 
     res.json(sanitized);
   } catch (err) {
-    console.error("Error in /public route:", err);
+    console.error("Error in /public route:", err && err.stack ? err.stack : err);
     res.status(500).json({ message: "Error loading public recipes" });
   }
 });
 
-// GET logged-in user recipes
+// GET mine (newest first)
 router.get("/mine", jwtAuth, async (req, res) => {
   try {
-    const myRecipes = await Recipe.find({ user: req.userId });
+    const myRecipes = await Recipe.find({ user: req.userId }).sort({ createdAt: -1 });
     res.json(myRecipes);
   } catch (err) {
+    console.error(err && err.stack ? err.stack : err);
     res.status(500).json({ message: "Error loading your recipes" });
   }
 });
 
-//  KEEP THIS LAST
+// GET by id
 router.get('/:id', async (req, res) => {
   try {
-    const r = await Recipe.findById(req.params.id);
+    const r = await Recipe.findById(req.params.id).populate("user", "name avatar");
     if (!r) return res.status(404).json({ message: 'Not found' });
     res.json(r);
   } catch (e) {
-    console.error(e);
+    console.error(e && e.stack ? e.stack : e);
     res.status(500).json({ message: 'Server error' });
   }
 });
 
-
-// UPDATE recipe (PUT)
+// UPDATE recipe (supports images + keepImages)
 router.put(
   "/:id",
   jwtAuth,
-  upload.fields([{ name: "image" }, { name: "video" }]),
+  upload.fields([{ name: "images" }, { name: "image" }, { name: "video" }]),
   async (req, res) => {
     try {
-      const { title, description, ingredients, isPublic } = req.body;
+      const { title, description, ingredients, steps, isPublic, replaceImages, keepImages } = req.body;
       const recipe = await Recipe.findById(req.params.id);
 
       if (!recipe) return res.status(404).json({ message: "Not found" });
       if (String(recipe.user) !== String(req.userId))
-  return res.status(401).json({ message: "Not authorized" });
+        return res.status(401).json({ message: "Not authorized" });
 
+      if (typeof title !== "undefined") recipe.title = title;
+      if (typeof description !== "undefined") recipe.description = description;
 
-      if (title) recipe.title = title;
-      if (description) recipe.description = description;
-      if (ingredients) recipe.ingredients = JSON.parse(ingredients);
+      // parse arrays safely
+      const parsedIngredients = safeParseArray(ingredients);
+      if (parsedIngredients && parsedIngredients.__parseError) {
+        return res.status(400).json({ message: "Invalid JSON for ingredients" });
+      }
+      if (typeof parsedIngredients !== "undefined") recipe.ingredients = parsedIngredients || [];
+
+      const parsedSteps = safeParseArray(steps);
+      if (parsedSteps && parsedSteps.__parseError) {
+        return res.status(400).json({ message: "Invalid JSON for steps" });
+      }
+      if (typeof parsedSteps !== "undefined") recipe.steps = parsedSteps || [];
+
       if (typeof isPublic !== "undefined")
         recipe.isPublic = isPublic === "true" || isPublic === true;
 
-      if (req.files && req.files.image)
-        recipe.image = await uploadToCloudinary(
-          req.files.image[0].buffer,
-          "recipes/images",
-          "image"
-        );
+      // Handle images:
+      // If replaceImages=true then start with keepImages (client sends JSON array of URLs to keep)
+      let imagesArr = Array.isArray(recipe.images) ? [...recipe.images] : [];
 
-      if (req.files && req.files.video)
-        recipe.video = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          "recipes/videos",
-          "video"
-        );
+      const replace = replaceImages === "true" || replaceImages === true;
+      let keep = safeParseArray(keepImages);
+      if (keep && keep.__parseError) {
+        return res.status(400).json({ message: "Invalid JSON for keepImages" });
+      }
+      if (replace) {
+        imagesArr = Array.isArray(keep) ? keep : [];
+      }
+
+      // append newly uploaded images (if any)
+      if (req.files && req.files.images && req.files.images.length) {
+        for (const f of req.files.images) {
+          const url = await uploadToCloudinary(f.buffer, "recipes/images", "image");
+          imagesArr.push(url);
+        }
+      }
+
+      // single-image fallback upload
+      if (req.files && req.files.image && req.files.image[0]) {
+        const url = await uploadToCloudinary(req.files.image[0].buffer, "recipes/images", "image");
+        imagesArr.push(url);
+      }
+
+      if (imagesArr.length) {
+        recipe.images = imagesArr;
+        recipe.image = imagesArr[0] || "";
+      }
+
+      // video upload
+      if (req.files && req.files.video && req.files.video[0]) {
+        recipe.video = await uploadToCloudinary(req.files.video[0].buffer, "recipes/videos", "video");
+      }
 
       await recipe.save();
       res.json(recipe);
     } catch (err) {
-      console.error(err);
+      console.error("Error updating recipe:", err && err.stack ? err.stack : err);
       res.status(500).json({ message: "Error updating recipe" });
     }
   }
 );
 
-// DELETE recipe (owner OR admin/superadmin)
+// DELETE
 router.delete("/:id", jwtAuth, async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
@@ -177,11 +230,9 @@ router.delete("/:id", jwtAuth, async (req, res) => {
     await recipe.deleteOne();
     res.json({ message: "Deleted" });
   } catch (err) {
-    console.error(err);
+    console.error(err && err.stack ? err.stack : err);
     res.status(500).json({ message: "Error deleting recipe" });
   }
 });
-
-
 
 module.exports = router;
