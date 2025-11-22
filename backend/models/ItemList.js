@@ -1,18 +1,19 @@
 // backend/models/ItemList.js
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
-const ItemSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  qty: { type: Number, required: true, default: 1 },
-  obtained: { type: Boolean, default: false } // toggled when user gets it
+const ItemSchema = new Schema({
+  name: { type: String, required: true, trim: true },
+  qty: { type: String, default: "" },   // store quantity as string to allow "2", "200", "2.5"
+  unit: { type: String, default: "" },  // e.g. kg, gm, packet
+  obtained: { type: Boolean, default: false }
 });
 
-const ItemListSchema = new mongoose.Schema({
-  title: { type: String, required: true },           // name of the shopping list
-  items: { type: [ItemSchema], default: [] },        // array of items
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  done: { type: Boolean, default: false },          // true when whole list is finished
-  createdAt: { type: Date, default: Date.now }
-});
+const ItemListSchema = new Schema({
+  user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+  title: { type: String, default: 'Shopping List' },
+  items: { type: [ItemSchema], default: [] },
+  isDone: { type: Boolean, default: false },
+}, { timestamps: true });
 
 module.exports = mongoose.model('ItemList', ItemListSchema);

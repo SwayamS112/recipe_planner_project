@@ -1,55 +1,100 @@
-// frontend/src/components/ItemListCard.jsx
-import React from 'react';
+import React, { useState } from "react";
 
-export default function ItemListCard({ list, onToggleItem, onMarkDone }) {
-  // support different shapes of list returned by backend
-  const items = list.items || [];
+export default function ItemListCard() {
+  const [itemName, setItemName] = useState("");
+  const [qty, setQty] = useState("");
+  const [unit, setUnit] = useState("kg");
+
+  const [items, setItems] = useState([]);
+
+  function addItem() {
+    if (!itemName.trim()) return alert("Enter item name");
+
+    const newItem = {
+      name: itemName,
+      qty,
+      unit,
+      obtained: false,
+    };
+
+    setItems([...items, newItem]);
+
+    // clear inputs
+    setItemName("");
+    setQty("");
+    setUnit("kg");
+  }
+
+  function toggleItem(index) {
+    const updated = [...items];
+    updated[index].obtained = !updated[index].obtained;
+    setItems(updated);
+  }
 
   return (
-    <div className={`border rounded-lg p-4 shadow-sm ${list.done ? 'bg-gray-50 opacity-80' : 'bg-white'}`}>
-      <div className="flex justify-between items-start mb-3">
-        <div>
-          <h3 className="text-lg font-semibold">{list.title || 'Untitled list'}</h3>
-          <p className="text-sm text-gray-500">{new Date(list.createdAt || Date.now()).toLocaleString()}</p>
-        </div>
-        <div className="text-right">
-          {list.done ? (
-            <span className="text-sm px-2 py-1 rounded bg-green-100 text-green-700">Completed</span>
-          ) : (
-            <span className="text-sm px-2 py-1 rounded bg-yellow-100 text-yellow-800">{items.filter(i => i.obtained).length}/{items.length} got</span>
-          )}
-        </div>
-      </div>
+    <div className="p-4 bg-white shadow rounded w-full max-w-xl">
 
-      <ul className="space-y-2 mb-4">
-        {items.map(item => (
-          <li key={item._id || item.name} className="flex items-center justify-between">
-            <div>
-              <div className={`font-medium ${item.obtained ? 'line-through text-gray-500' : ''}`}>{item.name}</div>
-              <div className="text-sm text-gray-600">Qty: {item.qty || item.quantity || 1}</div>
-            </div>
+      <h2 className="text-xl font-bold mb-4">Shopping List</h2>
 
-            <div>
-              <button
-                onClick={() => onToggleItem(list._id, item._id)}
-                className={`text-sm px-3 py-1 rounded ${item.obtained ? 'bg-green-600 text-white' : 'bg-gray-200'}`}
-              >
-                {item.obtained ? 'Got it' : 'Not yet'}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+      {/* Add Item Section */}
+      <div className="flex gap-2 mb-4">
 
-      <div className="flex justify-end">
-        <button
-          onClick={() => onMarkDone(list._id)}
-          disabled={list.done}
-          className={`px-4 py-1 rounded text-white ${list.done ? 'bg-gray-400 cursor-not-allowed' : 'bg-indigo-600'}`}
+        <input
+          type="text"
+          placeholder="Item name"
+          className="border p-2 w-full"
+          value={itemName}
+          onChange={(e) => setItemName(e.target.value)}
+        />
+
+        <input
+          type="number"
+          placeholder="Qty"
+          className="border p-2 w-20"
+          value={qty}
+          onChange={(e) => setQty(e.target.value)}
+        />
+
+        <select
+          className="border p-2"
+          value={unit}
+          onChange={(e) => setUnit(e.target.value)}
         >
-          {list.done ? 'Done' : "I'm done"}
+          <option value="kg">kg</option>
+          <option value="gm">gm</option>
+          <option value="packet">packet</option>
+          <option value="piece">piece</option>
+          <option value="litre">litre</option>
+        </select>
+
+        <button
+          onClick={addItem}
+          className="bg-amber-600 text-white px-3 rounded"
+        >
+          Add
         </button>
       </div>
+
+      {/* Items List (Ordered) */}
+      <ol className="list-decimal pl-5 space-y-2">
+        {items.map((item, index) => (
+          <li key={index} className="flex justify-between items-center">
+
+            <div>
+              <span className={`${item.obtained ? "line-through text-gray-500" : ""}`}>
+                {item.name} — {item.qty} {item.unit}
+              </span>
+            </div>
+
+            <input
+              type="checkbox"
+              checked={item.obtained}
+              onChange={() => toggleItem(index)}
+            />
+          </li>
+        ))}
+      </ol>
+
     </div>
   );
 }

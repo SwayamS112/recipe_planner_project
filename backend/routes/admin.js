@@ -1,91 +1,101 @@
-// routes/admin.js
+// backend/routes/admin.js
 const express = require('express');
 const router = express.Router();
-const { default: mongoose } = require('mongoose');
-const auth = require('../middleware/auth');
+const mongoose = require('mongoose');
+const auth = require('../middleware/auth'); // auth middleware that sets req.user & req.userId
+const requireRole = require('../middleware/roles'); // role helper (only import once)
 const User = require('../models/User');
-const Post = require('../models/Post'); 
+const Recipe = require('../models/Recipe'); // posts model
 
-// middleware to require specific roles
-const requireRole = (roles) => (req, res, next) => {
-  const role = req.user?.role;
-  if (!role || !roles.includes(role)) return res.status(403).json({ error: 'Forbidden' });
-  next();
-};
-
-// Require admin for all routes
+// protect all admin routes (admin + superadmin can access)
 router.use(auth);
-router.use(requireRole(["admin", "superadmin"]));
+router.use(requireRole(['admin', 'superadmin']));
 
-// GET all users (with simple filters)
-router.get("/users", async (req, res) => {
-  const users = await User.find().select("-passwordHash").sort({ createdAt: -1 });
+// list users (safe)
+router.get('/users', async (req, res) => {
+  const users = await User.find().select('-passwordHash -salt').sort({ createdAt: -1 });
   res.json(users);
 });
 
-// Block / Unblock user (admin or superadmin)
-// Note: prevent admins from blocking superadmin
+// block/unblock user (admin or superadmin). Admin cannot block superadmin.
 router.patch('/users/:id/block', async (req, res) => {
   try {
     const { id } = req.params;
     const { block } = req.body; // true/false
-    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid user id' });
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ error: 'Invalid id' });
+
     const target = await User.findById(id);
     if (!target) return res.status(404).json({ error: 'User not found' });
+
     if (target.role === 'superadmin') return res.status(403).json({ error: 'Cannot block superadmin' });
 
     target.isBlocked = !!block;
-    // optional: bump tokenVersion so existing tokens are invalidated
-    if (block) target.tokenVersion = (target.tokenVersion || 0) + 1;
+    if (block) target.tokenVersion = (target.tokenVersion || 0) + 1; // invalidate tokens
     await target.save();
-    res.json({ ok: true, user: { id: target._id, isBlocked: target.isBlocked }});
-  } catch (e) { res.status(400).json({ error: e.message }); }
+
+    return res.json({ ok: true, user: { id: target._id, isBlocked: target.isBlocked } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// Promote / demote role - only superadmin allowed to change roles
+// promote/demote role - ONLY superadmin allowed to change roles
 router.patch('/users/:id/role', requireRole(['superadmin']), async (req, res) => {
   try {
     const { id } = req.params;
-    const { role } = req.body; // 'user' or 'admin' (do NOT allow promoting to superadmin casually)
+    const { role } = req.body; // 'user' | 'admin'
     if (!['user', 'admin'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+
     const target = await User.findById(id);
     if (!target) return res.status(404).json({ error: 'User not found' });
+
     if (String(target._id) === String(req.userId)) return res.status(400).json({ error: 'Cannot change own role' });
 
     target.role = role;
-    // bump tokenVersion so tokens reflect new role requirement
-    target.tokenVersion = (target.tokenVersion || 0) + 1;
+    target.tokenVersion = (target.tokenVersion || 0) + 1; // require re-login so token reflects new role
     await target.save();
-    res.json({ ok: true, user: { id: target._id, role: target.role }});
-  } catch (e) { res.status(400).json({ error: e.message }); }
+
+    res.json({ ok: true, user: { id: target._id, role: target.role } });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// Posts moderation example (soft remove)
+/* POSTS moderation */
+// list all posts (for moderation)
 router.get('/posts', async (req, res) => {
-  const posts = await Post.find().populate('author', 'name email').sort({ createdAt: -1 });
+  const posts = await Recipe.find().populate('user', 'name email').sort({ createdAt: -1 });
   res.json(posts);
 });
 
-// Remove post (soft delete) or restore
+// soft remove/restore (admin or superadmin)
 router.patch('/posts/:id/remove', async (req, res) => {
   try {
     const { id } = req.params;
     const { remove } = req.body;
-    const post = await Post.findById(id);
+    const post = await Recipe.findById(id);
     if (!post) return res.status(404).json({ error: 'Post not found' });
     post.isRemoved = !!remove;
     post.removedBy = remove ? req.userId : undefined;
     await post.save();
     res.json({ ok: true, post: { id: post._id, isRemoved: post.isRemoved }});
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// permanent delete - superadmin only
+// permanent delete (superadmin only)
 router.delete('/posts/:id', requireRole(['superadmin']), async (req, res) => {
   try {
-    await Post.findByIdAndDelete(req.params.id);
+    await Recipe.findByIdAndDelete(req.params.id);
     res.json({ ok: true });
-  } catch (e) { res.status(400).json({ error: e.message }); }
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 module.exports = router;

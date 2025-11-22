@@ -34,10 +34,16 @@ const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
-  .then(() => {
+  .then(async () => {
     console.log('✅ MongoDB connected');
+
+    // Run bootstrap AFTER DB connection is ready
+    try {
+      await bootstrapAdmin(); // create main superadmin if not present
+    } catch (err) {
+      console.error('bootstrap error', err);
+    }
+
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
   .catch((err) => console.error('MongoDB connection failed:', err));
-
-bootstrapAdmin().catch(err => console.error('bootstrap error', err));

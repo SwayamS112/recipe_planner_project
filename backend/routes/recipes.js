@@ -5,6 +5,7 @@ const Recipe = require("../models/Recipe");
 const multer = require("multer");
 const jwtAuth = require('../middleware/auth');
 const cloudinary = require('../utils/cloudinary'); // use configured instance
+const requireRole = require('../middleware/roles');
 
 // Multer memory storage (no local file saving)
 const storage = multer.memoryStorage();
@@ -105,7 +106,7 @@ router.get("/mine", jwtAuth, async (req, res) => {
   }
 });
 
-// ✅ KEEP THIS LAST
+//  KEEP THIS LAST
 router.get('/:id', async (req, res) => {
   try {
     const r = await Recipe.findById(req.params.id);
@@ -162,13 +163,16 @@ router.put(
   }
 );
 
-// DELETE recipe
+// DELETE recipe (owner OR admin/superadmin)
 router.delete("/:id", jwtAuth, async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
     if (!recipe) return res.status(404).json({ message: "Not found" });
-   if (String(recipe.user) !== String(req.userId))
-  return res.status(401).json({ message: "Not authorized" });
+
+    const isOwner = String(recipe.user) === String(req.userId);
+    const isAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'superadmin');
+
+    if (!isOwner && !isAdmin) return res.status(401).json({ message: "Not authorized" });
 
     await recipe.deleteOne();
     res.json({ message: "Deleted" });
@@ -177,5 +181,7 @@ router.delete("/:id", jwtAuth, async (req, res) => {
     res.status(500).json({ message: "Error deleting recipe" });
   }
 });
+
+
 
 module.exports = router;

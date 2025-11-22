@@ -2,11 +2,14 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
+const Recipe = require('../models/Recipe'); // << ADD THIS LINE
 const jwt = require('jsonwebtoken');
 const { hashPassword } = require('../utils/hash');
 const upload = require('../utils/multer');
 const cloudinary = require('../utils/cloudinary');
 const auth = require('../middleware/auth');
+const requireRole = require('../middleware/roles');
+
 
 // SIGNUP
 router.post('/signup', upload.single('avatar'), async (req, res) => {
@@ -83,6 +86,7 @@ router.post('/login', async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+
 // GET current user
 router.get('/me', auth, async (req, res) => {
   try {
@@ -94,6 +98,17 @@ router.get('/me', auth, async (req, res) => {
     res.status(400).json({ error: e.message });
   }
 });
+
+router.get('/all-users', auth, requireRole(['admin','superadmin']), async (req,res) => {
+  const users = await User.find().select('-passwordHash -salt');
+  res.json(users);
+});
+
+router.get('/all', auth, requireRole(['admin','superadmin']), async (req,res) => {
+  const posts = await Recipe.find().populate('user','name email').lean();
+  res.json(posts);
+});
+
 
 // UPDATE profile (name, email, phone, avatar)
 router.put('/me', auth, upload.single('avatar'), async (req, res) => {

@@ -56,4 +56,6 @@ module.exports = async function (req, res, next) {
     console.error('Unexpected auth error:', err);
     return res.status(500).json({ error: 'Internal server error in auth middleware' });
   }
+
+  
 };
