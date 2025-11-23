@@ -1,151 +1,174 @@
+// frontend/src/pages/AddRecipe.jsx
 import React, { useState } from "react";
-import api from "../utils/api";
 import { useNavigate } from "react-router-dom";
+import api from "../utils/api";
 
 export default function AddRecipe() {
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [ingredients, setIngredients] = useState([{ name: "", quantity: "" }]);
-  const [image, setImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [video, setVideo] = useState(null);
-  const [isPublic, setIsPublic] = useState(false);
   const navigate = useNavigate();
 
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [ingredients, setIngredients] = useState([]); // array of {name, qty, unit}
+  const [steps, setSteps] = useState([]); // array of strings
+  const [newIngredient, setNewIngredient] = useState({ name: "", qty: "", unit: "" });
+  const [newStep, setNewStep] = useState("");
+  const [images, setImages] = useState([]); // File[]
+  const [video, setVideo] = useState(null);
+  const [isPublic, setIsPublic] = useState(true);
+  const [loading, setLoading] = useState(false);
+
   function addIngredient() {
-    setIngredients((prev) => [...prev, { name: "", quantity: "" }]);
+    if (!newIngredient.name.trim()) return;
+    setIngredients(prev => [...prev, { ...newIngredient, name: newIngredient.name.trim() }]);
+    setNewIngredient({ name: "", qty: "", unit: "" });
   }
 
-  function setIng(i, key, value) {
-    const copy = [...ingredients];
-    copy[i][key] = value;
-    setIngredients(copy);
+  function removeIngredient(idx) {
+    setIngredients(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function addStep() {
+    if (!newStep.trim()) return;
+    setSteps(prev => [...prev, newStep.trim()]);
+    setNewStep("");
+  }
+
+  function removeStep(idx) {
+    setSteps(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleImageFiles(e) {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    setImages(prev => [...prev, ...files]);
+    e.target.value = "";
+  }
+
+  function removeImage(idx) {
+    setImages(prev => prev.filter((_, i) => i !== idx));
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-
-     const fd = new FormData();
-  fd.append("title", title);
-  fd.append("description", description);
-  fd.append("ingredients", JSON.stringify(ingredientsArray));
-  fd.append("steps", JSON.stringify(stepsArray));
-  fd.append("isPublic", isPublic);
-
-    // images (multiple)
-  for (const file of imageFiles) {
-    fd.append("images", file); 
-  }
-
-   // optional: video
-  if (videoFile) {
-    fd.append("video", videoFile);
-  }
-
+    setLoading(true);
     try {
-      await api.post("/recipes", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      navigate("/dashboard");
-    } catch (e) {
-      alert(e.response?.data?.error || e.message);
+      const fd = new FormData();
+      fd.append("title", title);
+      fd.append("description", description);
+      fd.append("isPublic", isPublic ? "true" : "false");
+
+      // stringified structured ingredients
+      fd.append("ingredients", JSON.stringify(ingredients));
+      fd.append("steps", JSON.stringify(steps));
+
+      // images
+      images.forEach((f) => fd.append("images", f));
+      if (video) fd.append("video", video);
+
+      const res = await api.post("/recipes", fd);
+      alert("Recipe added");
+      navigate(`/recipes/${res.data._id}`);
+    } catch (err) {
+      console.error("Add failed:", err);
+      alert(err.response?.data?.message || "Failed to add recipe");
+    } finally {
+      setLoading(false);
     }
   }
 
   return (
-    <div className="max-w-2xl mx-auto mt-8 bg-white shadow-lg rounded-xl p-6">
-      <h2 className="text-2xl font-semibold mb-4 text-gray-800">Add New Recipe</h2>
+    <div className="p-4 max-w-3xl mx-auto">
+      <h2 className="text-2xl font-bold mb-4">Add Recipe</h2>
 
       <form onSubmit={handleSubmit} className="space-y-4">
-
-        <input
-          required
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Recipe title"
-          className="w-full border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-orange-200"
-        />
-
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Short description..."
-          className="w-full border rounded-lg px-3 py-2 h-24 focus:outline-none focus:ring focus:ring-orange-200"
-        />
+        <div>
+          <label className="block font-semibold">Title</label>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border p-2 rounded" />
+        </div>
 
         <div>
-          <h4 className="font-medium mb-2">Ingredients</h4>
-          <div className="space-y-2">
+          <label className="block font-semibold">Description</label>
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border p-2 rounded" rows={3} />
+        </div>
+
+        <div>
+          <label className="block font-semibold">Ingredients</label>
+
+          <div className="flex gap-2 mt-2">
+            <input placeholder="Name (e.g. Flour)" value={newIngredient.name}
+              onChange={e => setNewIngredient(prev => ({ ...prev, name: e.target.value }))}
+              className="flex-1 border p-2 rounded" />
+            <input placeholder="Qty (e.g. 2)" value={newIngredient.qty}
+              onChange={e => setNewIngredient(prev => ({ ...prev, qty: e.target.value }))}
+              className="w-24 border p-2 rounded" />
+            <input placeholder="Unit (e.g. cups)" value={newIngredient.unit}
+              onChange={e => setNewIngredient(prev => ({ ...prev, unit: e.target.value }))}
+              className="w-28 border p-2 rounded" />
+            <button type="button" onClick={addIngredient} className="px-3 py-1 bg-green-600 text-white rounded">Add</button>
+          </div>
+
+          <ul className="mt-2 space-y-1">
             {ingredients.map((ing, i) => (
-              <div key={i} className="flex gap-2">
-                <input
-                  value={ing.name}
-                  onChange={(e) => setIng(i, "name", e.target.value)}
-                  placeholder="Name"
-                  className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-orange-200"
-                />
-                <input
-                  value={ing.quantity}
-                  onChange={(e) => setIng(i, "quantity", e.target.value)}
-                  placeholder="Qty"
-                  className="w-28 border rounded-lg px-3 py-2 focus:outline-none focus:ring focus:ring-orange-200"
-                />
-              </div>
+              <li key={i} className="flex justify-between items-center">
+                <div>{ing.qty ? `${ing.qty} ${ing.unit} ` : ""}{ing.name}</div>
+                <button type="button" onClick={() => removeIngredient(i)} className="text-red-500">Remove</button>
+              </li>
             ))}
-            <button
-              type="button"
-              onClick={addIngredient}
-              className="text-sm text-orange-600 hover:underline"
-            >
-              + Add another ingredient
-            </button>
+            {ingredients.length === 0 && <li className="text-sm text-gray-500">No ingredients added</li>}
+          </ul>
+        </div>
+
+        <div>
+          <label className="block font-semibold">Steps</label>
+          <div className="flex gap-2 mt-2">
+            <input placeholder="Step description" value={newStep}
+              onChange={e => setNewStep(e.target.value)} className="flex-1 border p-2 rounded" />
+            <button type="button" onClick={addStep} className="px-3 py-1 bg-blue-600 text-white rounded">Add</button>
+          </div>
+
+          <ol className="mt-2 list-decimal list-inside">
+            {steps.map((s, i) => (
+              <li key={i} className="flex justify-between items-start">
+                <div>{s}</div>
+                <button type="button" onClick={() => removeStep(i)} className="text-red-500">Remove</button>
+              </li>
+            ))}
+            {steps.length === 0 && <li className="text-sm text-gray-500">No steps added</li>}
+          </ol>
+        </div>
+
+        <div>
+          <label className="block font-semibold">Images</label>
+          <input type="file" multiple accept="image/*" onChange={handleImageFiles} className="block mt-2" />
+          <div className="flex gap-2 mt-2 flex-wrap">
+            {images.map((f, i) => {
+              const url = URL.createObjectURL(f);
+              return (
+                <div key={i} className="relative">
+                  <img src={url} alt={f.name} className="w-32 h-24 object-cover rounded border" />
+                  <button type="button" onClick={() => removeImage(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs">×</button>
+                </div>
+              );
+            })}
+            {images.length === 0 && <div className="text-sm text-gray-500">No images selected</div>}
           </div>
         </div>
 
         <div>
-          <label className="block mb-1">Recipe Image</label>
-          <input
-            required
-            type="file"
-            accept="image/*"
-            onChange={(e) => {
-              const file = e.target.files[0];
-              setImage(file);
-              if (file) {
-                setImagePreview(URL.createObjectURL(file));
-              }
-            }}
-          />
-          {imagePreview && (
-            <img
-              src={imagePreview}
-              alt="preview"
-              className="mt-2 w-32 h-32 object-cover rounded-lg"
-            />
-          )}
+          <label className="block font-semibold">Video (optional)</label>
+          <input type="file" accept="video/*" onChange={e => setVideo(e.target.files?.[0] || null)} />
+          {video && <div className="mt-2 text-sm">{video.name}</div>}
         </div>
 
-        <div>
-          <label className="block mb-1">Recipe Video (optional)</label>
-          <input
-            type="file"
-            accept="video/*"
-            onChange={(e) => setVideo(e.target.files[0])}
-          />
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
+            <span>Public</span>
+          </label>
+
+          <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded">
+            {loading ? "Saving..." : "Save Recipe"}
+          </button>
         </div>
-
-        <label className="inline-flex items-center">
-          <input
-            type="checkbox"
-            checked={isPublic}
-            onChange={(e) => setIsPublic(e.target.checked)}
-          />
-          <span className="ml-2">Make this recipe public</span>
-        </label>
-
-        <button className="w-full bg-orange-500 text-white py-2 rounded-lg hover:bg-orange-600 transition">
-          Save Recipe
-        </button>
       </form>
     </div>
   );
