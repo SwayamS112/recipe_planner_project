@@ -60,11 +60,3 @@ Built using the **MERN stack**, it enables cooking enthusiasts to share their cr
 - Build a scalable backend using Node.js, Express, and MongoDB.  
 
 ---
-
-If you want, I can continue in the **same style** with:  
-✅ Installation Guide  
-✅ Folder Structure  
-✅ API Documentation  
-✅ Screenshots Section  
-
-Just tell me!
