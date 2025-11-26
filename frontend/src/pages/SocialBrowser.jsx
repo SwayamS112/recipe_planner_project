@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../utils/api";
 
-/* Inline SVG avatar generator (data URL) */
 function svgAvatarDataUrl(name = "User", size = 40) {
   const initials = (name || "U")
     .split(" ")

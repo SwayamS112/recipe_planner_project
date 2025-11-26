@@ -64,11 +64,51 @@ router.patch('/users/:id/role', requireRole(['superadmin']), async (req, res) =>
 });
 
 /* POSTS moderation */
-// list all posts (for moderation)
 router.get('/posts', async (req, res) => {
-  const posts = await Recipe.find().populate('user', 'name email').sort({ createdAt: -1 });
-  res.json(posts);
+  try {
+    // fetch raw posts
+    const posts = await Recipe.find().lean().sort({ createdAt: -1 });
+
+    // Detect which field stores user reference
+    const hasUserRef = Recipe.schema.path("user");
+    const hasAuthorRef = Recipe.schema.path("author");
+
+    if (hasUserRef || hasAuthorRef) {
+      const refField = hasUserRef ? "user" : "author";
+      const ids = posts.map(p => p[refField]).filter(Boolean).map(String);
+
+      let users = [];
+      if (ids.length > 0) {
+        users = await User.find({ _id: { $in: ids } })
+          .select("name email avatar")
+          .lean();
+      }
+
+      const userMap = {};
+      users.forEach(u => (userMap[String(u._id)] = u));
+
+      const out = posts.map(p => ({
+        ...p,
+        user: userMap[String(p[refField])] || { name: "Unknown", email: "", avatar: "" }
+      }));
+
+      return res.json(out);
+    }
+
+    // If schema has NO user reference field
+    const out = posts.map(p => ({
+      ...p,
+      user: p.user || { name: "Unknown", email: "", avatar: "" }
+    }));
+
+    return res.json(out);
+
+  } catch (err) {
+    console.error("Admin posts load error:", err);
+    res.status(500).json({ error: "Could not load posts" });
+  }
 });
+
 
 // soft remove/restore (admin or superadmin)
 router.patch('/posts/:id/remove', async (req, res) => {

@@ -4,8 +4,8 @@ const Schema = mongoose.Schema;
 
 const ItemSchema = new Schema({
   name: { type: String, required: true, trim: true },
-  qty: { type: String, default: "" },   // store quantity as string to allow "2", "200", "2.5"
-  unit: { type: String, default: "" },  // e.g. kg, gm, packet
+  qty: { type: String, default: "" },
+  unit: { type: String, default: "" },  // e.g. kg, gm, packet, etc
   obtained: { type: Boolean, default: false }
 });
 

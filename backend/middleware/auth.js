@@ -28,14 +28,9 @@ module.exports = async function (req, res, next) {
       return res.status(401).json({ error: 'Invalid token' });
     }
 
-    // Helpful debug log (remove in production)
-    // console.log('decoded token payload:', decoded);
-
-    // Support tokens that use either `id` or `userId` keys
     const userId = decoded && (decoded.id || decoded.userId);
     if (!userId) return res.status(401).json({ error: 'Token does not contain user id' });
 
-    // Validate as a mongoose ObjectId before calling findById
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       return res.status(401).json({ error: 'Invalid user id in token' });
     }
@@ -44,7 +39,6 @@ module.exports = async function (req, res, next) {
     if (!user) return res.status(401).json({ error: 'Invalid token (user not found)' });
     if (user.isBlocked) return res.status(403).json({ error: 'Account blocked' });
 
-    // Optional: tokenVersion checking if you include it in token
     if (typeof decoded.tokenVersion !== 'undefined' && decoded.tokenVersion !== user.tokenVersion) {
       return res.status(401).json({ error: 'Token invalidated' });
     }
@@ -56,6 +50,4 @@ module.exports = async function (req, res, next) {
     console.error('Unexpected auth error:', err);
     return res.status(500).json({ error: 'Internal server error in auth middleware' });
   }
-
-  
 };
