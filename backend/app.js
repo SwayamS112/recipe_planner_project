@@ -12,11 +12,17 @@ const authRouter = require('./routes/auth');
 const recipesRouter = require('./routes/recipes');
 const itemsRouter = require('./routes/items');
 
+const authRoutes = require('./routes/auth');
+
 const app = express();
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// mount auth routes
+app.use('/api/auth', authRoutes);
+console.log('Mounted /api/auth routes');
 
 // Routes
 app.use('/api/auth', authRouter);

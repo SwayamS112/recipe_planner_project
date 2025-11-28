@@ -3,15 +3,30 @@ import axios from 'axios';
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api',
-  // You can add default headers here if needed
 });
 
+// attach token to every request if present
+API.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers = config.headers || {};
+    config.headers.Authorization = `Bearer ${token}`;
+  } else {
+    // ensure header removed if no token
+    if (config.headers) delete config.headers.Authorization;
+  }
+  return config;
+}, (err) => Promise.reject(err));
+
 export function setAuthToken(token) {
+  if (token) localStorage.setItem('token', token);
+  else localStorage.removeItem('token');
+
+  // Do NOT rely solely on API.defaults.headers here — interceptor handles it.
   if (token) API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
   else delete API.defaults.headers.common['Authorization'];
 }
 
-// Item list endpoints
 export const createItemList = (data) => API.post('/items', data).then(res => res.data);
 export const getItemLists = () => API.get('/items').then(res => res.data);
 export const toggleItemObtained = (listId, itemId) =>
@@ -19,4 +34,4 @@ export const toggleItemObtained = (listId, itemId) =>
 export const markListDone = (listId) =>
   API.patch(`/items/${listId}/done`).then(res => res.data);
 
-// If your file uses default export, keep it; otherwise export above helpers alongside existing exports.
+export default API;

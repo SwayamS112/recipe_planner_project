@@ -6,29 +6,26 @@ import { useAdminMode } from "../../contexts/AdminModeContext";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 
+import ProfileTab from "./ProfileTab";
+import MyRecipesTab from "./MyRecipesTab";
+import SecurityTab from "./SecurityTab";
+
 /**
- * Dashboard with three tabs:
- * - Profile (edit avatar/name/email/phone)
- * - My Recipes (list + edit/delete for owner)
- * - Security (change password)
- *
- * If the logged user is admin or superadmin, a button to go to /admin is visible
- * and AdminMode toggle is shown to switch admin UI on/off.
+ * Refreshed Dashboard layout:
+ * - left nav with card & avatar
+ * - right content area with soft rounded panels
+ * - uses food-color accents (amber/orange/green)
  */
 
-export default function Dashboard() {
+export default function Dashboard({ setUser }) {
   const [tab, setTab] = useState("profile"); // profile | recipes | security
   const [currentUser, setCurrentUser] = useState(null);
   const [myRecipes, setMyRecipes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const { isAdminMode } = useAdminMode(); // read admin-mode (safe when provider is present)
-
-  // profile form state
-  const [form, setForm] = useState({ name: "", email: "", phone: "", avatarFile: null, avatarPreview: "" });
-  const [saving, setSaving] = useState(false);
+  const { isAdminMode } = useAdminMode?.() || { isAdminMode: false };
 
   useEffect(() => {
-    loadData();
+    void loadData();
     // eslint-disable-next-line
   }, []);
 
@@ -41,9 +38,7 @@ export default function Dashboard() {
         const meRes = await api.get("/auth/me");
         me = meRes.data;
         setCurrentUser(me);
-        setForm((f) => ({ ...f, name: me.name || "", email: me.email || "", phone: me.phone || "", avatarPreview: me.avatar || "" }));
       } catch (err) {
-        // not logged in or token invalid
         console.warn("not logged in", err);
         setCurrentUser(null);
       }
@@ -63,34 +58,8 @@ export default function Dashboard() {
     }
   }
 
-  // profile avatar file change
-  function onAvatarChange(e) {
-    const file = e.target.files?.[0] || null;
-    setForm((f) => ({ ...f, avatarFile: file, avatarPreview: file ? URL.createObjectURL(file) : f.avatarPreview }));
-  }
-
-  async function saveProfile() {
-    try {
-      setSaving(true);
-      const fd = new FormData();
-      fd.append("name", form.name);
-      fd.append("email", form.email);
-      fd.append("phone", form.phone || "");
-      if (form.avatarFile) fd.append("avatar", form.avatarFile);
-
-      const res = await api.put("/auth/me", fd, { headers: { "Content-Type": "multipart/form-data" }});
-      setCurrentUser(res.data.user);
-      toast.success("Profile updated");
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.error || "Update failed");
-    } finally {
-      setSaving(false);
-    }
-  }
-
+  // delete handler forwarded to MyRecipesTab
   async function handleDeleteRecipe(id) {
-    if (!confirm("Delete recipe?")) return;
     try {
       await api.delete(`/recipes/${id}`);
       setMyRecipes((prev) => prev.filter((r) => r._id !== id));
@@ -101,152 +70,113 @@ export default function Dashboard() {
     }
   }
 
-  if (loading) return <div className="p-6">Loading...</div>;
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-3">
+          <div className="h-6 w-48 bg-gray-200 rounded" />
+          <div className="h-96 bg-gray-100 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Your Account</h1>
+        <div>
+          <h1 className="text-3xl font-display font-semibold text-food-700">Your Account</h1>
+          <p className="text-sm text-slate-600 mt-1">Manage profile, your recipes and security settings.</p>
+        </div>
 
         <div className="flex items-center gap-4">
-          {/* Admin Mode toggle visible only to admins */}
           {currentUser && (currentUser.role === "admin" || currentUser.role === "superadmin") && (
             <>
               <AdminToggle />
-              <Link to="/admin" className="px-3 py-1 bg-rose-600 text-white rounded">Admin Panel</Link>
-              <div className="text-sm text-gray-600">Role: {currentUser.role}</div>
+              <Link to="/admin" className="px-3 py-1 bg-food-500 hover:bg-food-600 text-white rounded shadow">
+                Admin Panel
+              </Link>
+              <div className="text-sm text-slate-600">Role: <span className="font-medium">{currentUser.role}</span></div>
             </>
           )}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {/* Left nav */}
-        <div className="col-span-1 bg-white rounded shadow p-4">
+        {/* Left nav card */}
+        <aside className="col-span-1 bg-white rounded-2xl shadow-lg p-5">
           <div className="text-center mb-4">
-            <div className="w-20 h-20 bg-gray-100 rounded-full mx-auto flex items-center justify-center text-xl">
-              {currentUser?.avatar ? <img src={currentUser.avatar} className="w-20 h-20 rounded-full object-cover" alt="avatar" /> : (currentUser?.name?.[0] || "U")}
-            </div>
-            <div className="mt-2 font-medium">{currentUser?.name || currentUser?.email}</div>
-          </div>
-
-          <nav className="space-y-2">
-            <button onClick={() => setTab("profile")} className={`w-full text-left px-3 py-2 rounded ${tab === "profile" ? "bg-amber-50" : ""}`}>Profile</button>
-            <button onClick={() => setTab("recipes")} className={`w-full text-left px-3 py-2 rounded ${tab === "recipes" ? "bg-amber-50" : ""}`}>My Recipes</button>
-            <button onClick={() => setTab("security")} className={`w-full text-left px-3 py-2 rounded ${tab === "security" ? "bg-amber-50" : ""}`}>Security</button>
-          </nav>
-        </div>
-
-        {/* Right content */}
-        <div className="col-span-3 bg-white rounded shadow p-6">
-          {tab === "profile" && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Profile</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium">Name</label>
-                  <input value={form.name} onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))} className="w-full border p-2 rounded mb-3" />
-
-                  <label className="block text-sm font-medium">Email</label>
-                  <input value={form.email} onChange={(e) => setForm(f => ({ ...f, email: e.target.value }))} className="w-full border p-2 rounded mb-3" />
-
-                  <label className="block text-sm font-medium">Phone (10 digits)</label>
-                  <input value={form.phone || ""} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))} className="w-full border p-2 rounded mb-3" />
-
-                  <button disabled={saving} onClick={saveProfile} className="mt-2 px-4 py-2 bg-amber-600 text-white rounded">Save profile</button>
-                </div>
-
-                <div className="flex flex-col items-center">
-                  <div className="w-28 h-28 rounded-full overflow-hidden mb-3">
-                    {form.avatarPreview ? <img src={form.avatarPreview} className="w-full h-full object-cover" alt="avatar" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center">No</div>}
-                  </div>
-                  <input type="file" accept="image/*" onChange={onAvatarChange} />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {tab === "recipes" && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">My Recipes</h2>
-              {myRecipes.length === 0 ? <div>No recipes yet. <Link to="/add" className="text-orange-600">Add one</Link></div> : (
-                <div className="grid gap-4">
-                  {myRecipes.map(r => (
-                    <div key={r._id} className="p-4 border rounded flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold">{r.title}</div>
-                        <div className="text-sm text-gray-600">{r.description}</div>
-                      </div>
-                      <div className="flex gap-2">
-                        <Link to={`/recipes/${r._id}/edit`} className="px-3 py-1 border rounded">Edit</Link>
-
-                        {/* If admin-mode is ON and user is admin, allow admin delete too (owner always can delete) */}
-                        <button onClick={() => handleDeleteConfirm(r._id)} className="px-3 py-1 border rounded">Delete</button>
-                      </div>
-                    </div>
-                  ))}
+            <div className="w-28 h-28 rounded-full mx-auto overflow-hidden ring-2 ring-food-100 shadow">
+              {currentUser?.avatar ? (
+                <img src={currentUser.avatar} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-amber-50 flex items-center justify-center text-2xl font-bold text-food-700">
+                  {currentUser?.name?.[0] || "U"}
                 </div>
               )}
             </div>
-          )}
 
-          {tab === "security" && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Security</h2>
-              <SecurityForm />
+            <div className="mt-3">
+              <div className="text-lg font-medium text-slate-800">{currentUser?.name || currentUser?.email}</div>
+              <div className="text-sm text-slate-500">{currentUser?.email}</div>
             </div>
+          </div>
+
+          <nav className="mt-4 space-y-2">
+            <button
+              onClick={() => setTab("profile")}
+              className={`w-full text-left px-4 py-3 rounded-xl transition flex items-center gap-3 ${
+                tab === "profile" ? "bg-food-50 ring-1 ring-food-200" : "hover:bg-slate-50"
+              }`}
+            >
+              <span className="font-medium">Profile</span>
+              <span className="ml-auto text-xs text-slate-400">Edit</span>
+            </button>
+
+            <button
+              onClick={() => setTab("recipes")}
+              className={`w-full text-left px-4 py-3 rounded-xl transition flex items-center gap-3 ${
+                tab === "recipes" ? "bg-food-50 ring-1 ring-food-200" : "hover:bg-slate-50"
+              }`}
+            >
+              <span className="font-medium">My Recipes</span>
+              <span className="ml-auto text-xs text-slate-400">{myRecipes.length}</span>
+            </button>
+
+            <button
+              onClick={() => setTab("security")}
+              className={`w-full text-left px-4 py-3 rounded-xl transition flex items-center gap-3 ${
+                tab === "security" ? "bg-food-50 ring-1 ring-food-200" : "hover:bg-slate-50"
+              }`}
+            >
+              <span className="font-medium">Security</span>
+              <span className="ml-auto text-xs text-slate-400">Password</span>
+            </button>
+          </nav>
+
+          <div className="mt-6 border-t pt-4">
+            <Link to="/add" className="block text-center py-2 bg-food-500 text-black rounded-lg shadow">
+              Add Recipe
+            </Link>
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <section className="col-span-3 bg-white rounded-2xl shadow-lg p-6">
+          {tab === "profile" && (
+            <ProfileTab setUser={(u) => { setUser?.(u); setCurrentUser(u); }} />
           )}
-        </div>
+
+          {tab === "recipes" && (
+            <MyRecipesTab
+              recipes={myRecipes}
+              onDelete={(id) => handleDeleteRecipe(id)}
+            />
+          )}
+
+          {tab === "security" && <SecurityTab />}
+        </section>
       </div>
-    </div>
-  );
-
-  // local functions
-  function handleDeleteConfirm(id) {
-    if (!confirm("Delete this recipe?")) return;
-    handleDeleteRecipe(id);
-  }
-
-  async function handleDeleteRecipe(id) {
-    try {
-      await api.delete(`/recipes/${id}`);
-      setMyRecipes(prev => prev.filter(r => r._id !== id));
-      toast.success("Deleted");
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || "Delete failed");
-    }
-  }
-}
-
-// small security form component (change password)
-function SecurityForm() {
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleChange() {
-    if (!currentPassword || !newPassword) return alert("Fill both fields");
-    setLoading(true);
-    try {
-      await api.put("/auth/change-password", { currentPassword, newPassword });
-      alert("Password changed. Please login again.");
-      // optionally: logout user
-    } catch (err) {
-      console.error(err);
-      alert(err.response?.data?.error || "Change failed");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div className="max-w-md">
-      <label className="block text-sm">Current password</label>
-      <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} className="w-full p-2 border rounded mb-3" />
-      <label className="block text-sm">New password</label>
-      <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full p-2 border rounded mb-3" />
-      <button disabled={loading} onClick={handleChange} className="px-4 py-2 bg-amber-600 text-white rounded">Change password</button>
     </div>
   );
 }

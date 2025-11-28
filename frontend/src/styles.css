@@ -1,1 +1,33 @@
-@import 'tailwindcss'
+@import 'tailwindcss';
+
+body { 
+  font-family: 'Inter', sans-serif 
+}
+
+h1, h2, h3 { 
+  font-family: 'Playfair Display', serif; 
+}
+
+/* optional - paste at end of src/styles.css */
+:root{
+  --food-50: #fffaf5;
+  --food-100: #fff0e6;
+  --food-300: #ffb580;
+  --food-500: #ff7a2d;
+  --food-700: #c95318;
+}
+
+/* utility-like classes (safe small additions) */
+.bg-food-500 { background-color: var(--food-500); }
+.bg-food-600 { background-color: #e86b10; } /* slightly darker */
+.text-food-700 { color: var(--food-700); }
+.ring-food-300 { box-shadow: 0 0 0 4px rgba(255,122,45,0.08); }
+
+/* add to end of src/styles.css */
+.modal-backdrop {
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+
+/* small tweak for viewer scrollbar */
+.media-viewer-scroll::-webkit-scrollbar { height: 8px; }

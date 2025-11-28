@@ -4,7 +4,6 @@ import api from "../utils/api";
 import { toast } from "sonner";
 
 export default function PostItem({ post, currentUser, onUpdated }) {
-  // post example fields: {_id, title, content, isRemoved, user: {name, email}}
   const [loading, setLoading] = useState(false);
 
   const isAdmin = currentUser && (currentUser.role === "admin" || currentUser.role === "superadmin");
@@ -17,7 +16,7 @@ export default function PostItem({ post, currentUser, onUpdated }) {
     try {
       await api.patch(`/admin/posts/${post._id}/remove`, { remove });
       toast.success(remove ? "Removed" : "Restored");
-      onUpdated?.(); // tell parent to refresh
+      onUpdated?.();
     } catch (err) {
       console.error(err);
       toast.error(err.response?.data?.error || "Action failed");
@@ -39,19 +38,18 @@ export default function PostItem({ post, currentUser, onUpdated }) {
   }
 
   return (
-    <div className="bg-white rounded p-4 shadow">
+    <div className="bg-white rounded-2xl p-4 shadow">
       <div className="flex justify-between items-start gap-4">
         <div>
-          <div className="text-lg font-semibold">{post.title}</div>
-          <div className="text-sm text-gray-600">By: {post.user?.name || post.user?.email || "Unknown"}</div>
+          <div className="text-lg font-semibold text-slate-800">{post.title}</div>
+          <div className="text-sm text-gray-500">By: {post.user?.name || post.user?.email || "Unknown"}</div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* moderation controls appear only to admin and when parent wrapped with admin-mode check */}
           {isAdmin && (
             <>
               <button
-                className="px-3 py-1 border rounded bg-amber-50 text-amber-700 disabled:opacity-50"
+                className="px-3 py-1 rounded-lg bg-amber-50 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
                 onClick={handleRemoveToggle}
                 disabled={loading}
               >
@@ -60,7 +58,7 @@ export default function PostItem({ post, currentUser, onUpdated }) {
 
               {currentUser?.role === "superadmin" && (
                 <button
-                  className="px-3 py-1 border rounded text-red-600 disabled:opacity-50"
+                  className="px-3 py-1 rounded-lg border text-red-600 hover:bg-red-50 disabled:opacity-50"
                   onClick={handlePermanentDelete}
                   disabled={loading}
                 >
@@ -72,10 +70,10 @@ export default function PostItem({ post, currentUser, onUpdated }) {
         </div>
       </div>
 
-      <p className="mt-3 text-gray-700">{post.content?.slice(0, 400)}</p>
+      <p className="mt-3 text-slate-700">{post.content?.slice(0, 400)}</p>
 
       {post.isRemoved && (
-        <div className="mt-2 text-sm text-red-600">Removed by moderator</div>
+        <div className="mt-3 text-sm text-red-600">Removed by moderator</div>
       )}
     </div>
   );

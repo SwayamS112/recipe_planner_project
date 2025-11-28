@@ -5,6 +5,7 @@ const Recipe = require("../models/Recipe");
 const multer = require("multer");
 const jwtAuth = require("../middleware/auth");
 const cloudinary = require("../utils/cloudinary");
+const util = require('util');
 
 // Multer memory storage
 const storage = multer.memoryStorage();
@@ -24,27 +25,15 @@ const uploadToCloudinary = async (buffer, folder, resourceType = "image") =>
       .end(buffer);
   });
 
-/**
- * Utility: pick which user field the Recipe schema uses.
- * returns either "user", "author", or null.
- */
 function getUserFieldName() {
   if (Recipe.schema.path("user")) return "user";
   if (Recipe.schema.path("author")) return "author";
   return null;
 }
 
-/**
- * Safe JSON parsing for arrays OR structured ingredient-array:
- * Accepts:
- * - JSON.stringify([...])
- * - actual array
- * - newline string fallback (converted to objects for ingredients)
- */
 function parseArrayField(input, isIngredient = false) {
   if (!input) return [];
 
-  // Already an array → accept
   if (Array.isArray(input)) return input;
 
   if (typeof input === "string") {
@@ -55,23 +44,20 @@ function parseArrayField(input, isIngredient = false) {
       const parsed = JSON.parse(trimmed);
       if (Array.isArray(parsed)) return parsed;
     } catch (err) {
-      // fallback: newline separated list
       const lines = trimmed.split("\n").map((s) => s.trim()).filter(Boolean);
 
       if (isIngredient) {
         return lines.map((name) => ({ name, qty: "", unit: "" }));
       }
 
-      return lines; // steps fallback
+      return lines; 
     }
   }
 
   return [];
 }
 
-/* ============================================================
-   CREATE RECIPE
-   ============================================================ */
+  //  CREATE RECIPE
 router.post(
   "/",
   jwtAuth,
@@ -146,9 +132,9 @@ router.post(
   }
 );
 
-/* ============================================================
+/* 
    GET PUBLIC
-   ============================================================ */
+    */
 router.get("/public", async (req, res) => {
   try {
     const publicRecipes = await Recipe.find({ isPublic: true })
@@ -200,9 +186,9 @@ router.get("/public", async (req, res) => {
   }
 });
 
-/* ============================================================
+/* 
    GET MINE
-   ============================================================ */
+    */
 router.get("/mine", jwtAuth, async (req, res) => {
   try {
     const userField = getUserFieldName();
@@ -215,9 +201,9 @@ router.get("/mine", jwtAuth, async (req, res) => {
   }
 });
 
-/* ============================================================
+/* 
    GET BY ID
-   ============================================================ */
+    */
 router.get("/:id", async (req, res) => {
   try {
     const r = await Recipe.findById(req.params.id).lean();
@@ -231,7 +217,7 @@ router.get("/:id", async (req, res) => {
         const User = require("../models/User");
         const u = await User.findById(r[userField]).select("name avatar").lean();
         if (u) userObj = u;
-      } catch (e) { /* ignore */ }
+      } catch (e) { }
     } else if (r.user) {
       userObj = r.user;
     }
@@ -251,9 +237,9 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-/* ============================================================
+/* 
    UPDATE
-   ============================================================ */
+    */
 router.put(
   "/:id",
   jwtAuth,
@@ -332,9 +318,9 @@ router.put(
   }
 );
 
-/* ============================================================
+/* 
    DELETE
-   ============================================================ */
+    */
 router.delete("/:id", jwtAuth, async (req, res) => {
   try {
     const recipe = await Recipe.findById(req.params.id);
@@ -359,6 +345,8 @@ router.delete("/:id", jwtAuth, async (req, res) => {
 
 //Likes
 router.post("/:id/like", jwtAuth, async (req, res) => {
+  console.log('DEBUG /like - auth header sample:', (req.headers.authorization || '').slice(0,60));
+  console.log('DEBUG /like - req.userId:', req.userId);
   try {
     const recipe = await Recipe.findById(req.params.id);
     if (!recipe) return res.status(404).json({ message: "Recipe not found" });
@@ -387,6 +375,8 @@ router.post("/:id/like", jwtAuth, async (req, res) => {
 
 //Comments
 router.post("/:id/comment", jwtAuth, async (req, res) => {
+  console.log('DEBUG /comment - auth header sample:', (req.headers.authorization || '').slice(0,60));
+  console.log('DEBUG /comment - req.userId:', req.userId);
   try {
     const { text } = req.body;
 

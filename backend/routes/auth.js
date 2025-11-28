@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const Recipe = require('../models/Recipe'); // << ADD THIS LINE
+// const Recipe = require('../models/Recipe'); // << ADD THIS LINE
 const jwt = require('jsonwebtoken');
 const { hashPassword } = require('../utils/hash');
 const upload = require('../utils/multer');
@@ -10,9 +10,8 @@ const cloudinary = require('../utils/cloudinary');
 const auth = require('../middleware/auth');
 const requireRole = require('../middleware/roles');
 
-
-// SIGNUP
-router.post('/signup', upload.single('avatar'), async (req, res) => {
+// Shared signup handler
+async function signupHandler(req, res) {
   try {
     const { name, email, password } = req.body;
     if (!name || !email || !password)
@@ -40,7 +39,7 @@ router.post('/signup', upload.single('avatar'), async (req, res) => {
       salt,
       avatar: avatarUrl,
       phone: null,
-      role: 'user' // explicitly set default role
+      role: 'user'
     });
 
     const token = jwt.sign(
@@ -54,10 +53,16 @@ router.post('/signup', upload.single('avatar'), async (req, res) => {
       user: { id: user._id, name: user.name, email: user.email, avatar: user.avatar, phone: user.phone, role: user.role }
     });
   } catch (e) {
-    console.error(e);
+    console.error('signup error', e);
     res.status(400).json({ error: e.message });
   }
-});
+}
+
+// SIGNUP
+router.post('/signup', upload.single('avatar'), signupHandler);
+
+//Register
+router.post('/register', upload.single('avatar'), signupHandler);
 
 // LOGIN
 router.post('/login', async (req, res) => {

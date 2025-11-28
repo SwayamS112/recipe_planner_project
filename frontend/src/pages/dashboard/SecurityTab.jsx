@@ -1,4 +1,4 @@
-// frontend/src/pages/dashboard/SecurityTab.jsx
+// src/pages/dashboard/SecurityTab.jsx
 import React, { useState } from "react";
 import api from "../../utils/api";
 import { toast } from "sonner";
@@ -10,6 +10,10 @@ export default function SecurityTab() {
 
   async function handleChange(e) {
     e.preventDefault();
+    if (!currentPassword || !newPassword) {
+      toast.error("Fill both fields");
+      return;
+    }
     setLoading(true);
     try {
       await api.put("/auth/change-password", { currentPassword, newPassword });
@@ -27,14 +31,18 @@ export default function SecurityTab() {
   return (
     <form onSubmit={handleChange} className="space-y-4 max-w-lg">
       <div>
-        <label className="block">Current password</label>
+        <label className="block text-sm text-slate-700">Current password</label>
         <input type="password" value={currentPassword} onChange={e=>setCurrentPassword(e.target.value)} className="input" required />
       </div>
       <div>
-        <label className="block">New password</label>
-        <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="input" required />
+        <label className="block text-sm text-slate-700">New password</label>
+        <input type="password" value={newPassword} onChange={e=>setNewPassword(e.target.value)} className="input text-black" required />
       </div>
-      <button className="btn bg-orange-500 text-white">{loading ? 'Saving...' : 'Change password'}</button>
+      <div>
+        <button type="submit" disabled={loading} className="btn text-center py-2 px-2 bg-food-500 text-black rounded-lg shadow">
+          {loading ? 'Saving...' : 'Change password'}
+        </button>
+      </div>
     </form>
   );
 }

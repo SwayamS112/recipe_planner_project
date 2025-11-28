@@ -8,168 +8,252 @@ export default function AddRecipe() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [ingredients, setIngredients] = useState([]); // array of {name, qty, unit}
-  const [steps, setSteps] = useState([]); // array of strings
+  const [ingredients, setIngredients] = useState([]);
+  const [steps, setSteps] = useState([]);
   const [newIngredient, setNewIngredient] = useState({ name: "", qty: "", unit: "" });
   const [newStep, setNewStep] = useState("");
-  const [images, setImages] = useState([]); // File[]
+  const [images, setImages] = useState([]);
   const [video, setVideo] = useState(null);
   const [isPublic, setIsPublic] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  function addIngredient() {
+  const addIngredient = () => {
     if (!newIngredient.name.trim()) return;
-    setIngredients(prev => [...prev, { ...newIngredient, name: newIngredient.name.trim() }]);
+    setIngredients([...ingredients, newIngredient]);
     setNewIngredient({ name: "", qty: "", unit: "" });
-  }
+  };
 
-  function removeIngredient(idx) {
-    setIngredients(prev => prev.filter((_, i) => i !== idx));
-  }
+  const removeIngredient = (i) => {
+    setIngredients(ingredients.filter((_, idx) => idx !== i));
+  };
 
-  function addStep() {
+  const addStep = () => {
     if (!newStep.trim()) return;
-    setSteps(prev => [...prev, newStep.trim()]);
+    setSteps([...steps, newStep.trim()]);
     setNewStep("");
-  }
+  };
 
-  function removeStep(idx) {
-    setSteps(prev => prev.filter((_, i) => i !== idx));
-  }
+  const removeStep = (i) => {
+    setSteps(steps.filter((_, idx) => idx !== i));
+  };
 
-  function handleImageFiles(e) {
-    const files = e.target.files ? Array.from(e.target.files) : [];
-    setImages(prev => [...prev, ...files]);
-    e.target.value = "";
-  }
+  const handleImages = (e) => {
+    const files = Array.from(e.target.files || []);
+    setImages([...images, ...files]);
+  };
 
-  function removeImage(idx) {
-    setImages(prev => prev.filter((_, i) => i !== idx));
-  }
+  const removeImage = (i) => {
+    setImages(images.filter((_, idx) => idx !== i));
+  };
 
-  async function handleSubmit(e) {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
       const fd = new FormData();
       fd.append("title", title);
       fd.append("description", description);
       fd.append("isPublic", isPublic ? "true" : "false");
 
-      // stringified structured ingredients
       fd.append("ingredients", JSON.stringify(ingredients));
       fd.append("steps", JSON.stringify(steps));
 
-      // images
-      images.forEach((f) => fd.append("images", f));
+      images.forEach((img) => fd.append("images", img));
       if (video) fd.append("video", video);
 
       const res = await api.post("/recipes", fd);
-      alert("Recipe added");
+      alert("Recipe added!");
       navigate(`/recipes/${res.data._id}`);
     } catch (err) {
-      console.error("Add failed:", err);
-      alert(err.response?.data?.message || "Failed to add recipe");
-    } finally {
-      setLoading(false);
+      alert(err.response?.data?.message || "Error adding recipe");
     }
-  }
+
+    setLoading(false);
+  };
 
   return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <h2 className="text-2xl font-bold mb-4">Add Recipe</h2>
+<div className="min-h-screen bg-linear-to-br from-orange-50 via-amber-50 to-rose-50">
+  <div className="max-w-4xl mx-auto p-6">
+      <h1 className="text-3xl font-semibold text-amber-700 mb-6">
+        Add a New Recipe
+      </h1>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-8 bg-white rounded-xl p-6 shadow-lg">
+
+        {/* Title */}
         <div>
-          <label className="block font-semibold">Title</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} className="w-full border p-2 rounded" />
+          <label className="block text-sm font-semibold mb-1">Recipe Title</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-300"
+            placeholder="e.g. Chocolate Cake"
+          />
         </div>
 
+        {/* Description */}
         <div>
-          <label className="block font-semibold">Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} className="w-full border p-2 rounded" rows={3} />
+          <label className="block text-sm font-semibold mb-1">Description</label>
+          <textarea
+            rows={3}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-amber-300"
+            placeholder="Short description of your recipe..."
+          />
         </div>
 
+        {/* Ingredients */}
         <div>
-          <label className="block font-semibold">Ingredients</label>
+          <h2 className="text-xl font-semibold text-amber-700 mb-2">Ingredients</h2>
 
-          <div className="flex gap-2 mt-2">
-            <input placeholder="Name (e.g. Flour)" value={newIngredient.name}
-              onChange={e => setNewIngredient(prev => ({ ...prev, name: e.target.value }))}
-              className="flex-1 border p-2 rounded" />
-            <input placeholder="Qty (e.g. 2)" value={newIngredient.qty}
-              onChange={e => setNewIngredient(prev => ({ ...prev, qty: e.target.value }))}
-              className="w-24 border p-2 rounded" />
-            <input placeholder="Unit (e.g. cups)" value={newIngredient.unit}
-              onChange={e => setNewIngredient(prev => ({ ...prev, unit: e.target.value }))}
-              className="w-28 border p-2 rounded" />
-            <button type="button" onClick={addIngredient} className="px-3 py-1 bg-green-600 text-white rounded">Add</button>
+          {/* Input row */}
+          <div className="grid grid-cols-4 gap-3">
+            <input
+              placeholder="Name"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-300"
+              value={newIngredient.name}
+              onChange={(e) => setNewIngredient({ ...newIngredient, name: e.target.value })}
+            />
+            <input
+              placeholder="Qty"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-300"
+              value={newIngredient.qty}
+              onChange={(e) => setNewIngredient({ ...newIngredient, qty: e.target.value })}
+            />
+            <input
+              placeholder="Unit"
+              className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-300"
+              value={newIngredient.unit}
+              onChange={(e) => setNewIngredient({ ...newIngredient, unit: e.target.value })}
+            />
+            <button
+              type="button"
+              onClick={addIngredient}
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-3 py-2"
+            >
+              Add
+            </button>
           </div>
 
-          <ul className="mt-2 space-y-1">
+          {/* Ingredient List */}
+          <div className="mt-3 space-y-2">
+            {ingredients.length === 0 && (
+              <p className="text-sm text-gray-500">No ingredients added yet.</p>
+            )}
+
             {ingredients.map((ing, i) => (
-              <li key={i} className="flex justify-between items-center">
-                <div>{ing.qty ? `${ing.qty} ${ing.unit} ` : ""}{ing.name}</div>
-                <button type="button" onClick={() => removeIngredient(i)} className="text-red-500">Remove</button>
-              </li>
+              <div
+                key={i}
+                className="flex justify-between bg-amber-50 px-4 py-2 rounded-lg"
+              >
+                <span className="text-gray-700">
+                  {ing.qty && `${ing.qty} ${ing.unit} - `}{ing.name}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => removeIngredient(i)}
+                  className="text-red-500 text-sm"
+                >
+                  Remove
+                </button>
+              </div>
             ))}
-            {ingredients.length === 0 && <li className="text-sm text-gray-500">No ingredients added</li>}
-          </ul>
+          </div>
         </div>
 
+        {/* Steps */}
         <div>
-          <label className="block font-semibold">Steps</label>
-          <div className="flex gap-2 mt-2">
-            <input placeholder="Step description" value={newStep}
-              onChange={e => setNewStep(e.target.value)} className="flex-1 border p-2 rounded" />
-            <button type="button" onClick={addStep} className="px-3 py-1 bg-blue-600 text-white rounded">Add</button>
+          <h2 className="text-xl font-semibold text-amber-700 mb-2">Steps</h2>
+
+          <div className="flex gap-3">
+            <input
+              value={newStep}
+              placeholder="Describe the step..."
+              onChange={(e) => setNewStep(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-amber-300"
+            />
+            <button
+              type="button"
+              onClick={addStep}
+              className="bg-amber-600 hover:bg-amber-700 text-white rounded-lg px-4 py-2"
+            >
+              Add
+            </button>
           </div>
 
-          <ol className="mt-2 list-decimal list-inside">
+          <ol className="mt-3 space-y-2 list-decimal list-inside">
             {steps.map((s, i) => (
-              <li key={i} className="flex justify-between items-start">
-                <div>{s}</div>
-                <button type="button" onClick={() => removeStep(i)} className="text-red-500">Remove</button>
+              <li key={i} className="bg-amber-50 px-4 py-2 rounded-lg flex justify-between">
+                <span>{s}</span>
+                <button
+                  type="button"
+                  onClick={() => removeStep(i)}
+                  className="text-red-500 text-sm"
+                >
+                  Remove
+                </button>
               </li>
             ))}
-            {steps.length === 0 && <li className="text-sm text-gray-500">No steps added</li>}
+            {steps.length === 0 && (
+              <p className="text-sm text-gray-500">No steps added yet.</p>
+            )}
           </ol>
         </div>
 
+        {/* Images */}
         <div>
-          <label className="block font-semibold">Images</label>
-          <input type="file" multiple accept="image/*" onChange={handleImageFiles} className="block mt-2" />
-          <div className="flex gap-2 mt-2 flex-wrap">
-            {images.map((f, i) => {
-              const url = URL.createObjectURL(f);
+          <h2 className="text-xl font-semibold text-amber-700 mb-2">Images</h2>
+
+          <input type="file" accept="image/*" multiple onChange={handleImages} />
+
+          <div className="flex flex-wrap gap-3 mt-3">
+            {images.map((file, i) => {
+              const src = URL.createObjectURL(file);
               return (
                 <div key={i} className="relative">
-                  <img src={url} alt={f.name} className="w-32 h-24 object-cover rounded border" />
-                  <button type="button" onClick={() => removeImage(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs">×</button>
+                  <img src={src} className="w-32 h-24 rounded-lg object-cover shadow" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-6 h-6"
+                  >
+                    ×
+                  </button>
                 </div>
               );
             })}
-            {images.length === 0 && <div className="text-sm text-gray-500">No images selected</div>}
           </div>
         </div>
 
+        {/* Video */}
         <div>
-          <label className="block font-semibold">Video (optional)</label>
-          <input type="file" accept="video/*" onChange={e => setVideo(e.target.files?.[0] || null)} />
-          {video && <div className="mt-2 text-sm">{video.name}</div>}
+          <h2 className="text-xl font-semibold text-amber-700 mb-2">Video (Optional)</h2>
+          <input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0])} />
+          {video && <p className="text-sm text-gray-600 mt-1">{video.name}</p>}
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2">
-            <input type="checkbox" checked={isPublic} onChange={e => setIsPublic(e.target.checked)} />
-            <span>Public</span>
+        {/* Public + Submit */}
+        <div className="flex items-center gap-3 pt-4 border-t">
+          <label className="flex items-center gap-2 text-gray-700">
+            <input
+              type="checkbox"
+              checked={isPublic}
+              onChange={(e) => setIsPublic(e.target.checked)}
+            />
+            Public
           </label>
 
-          <button type="submit" disabled={loading} className="px-4 py-2 bg-blue-600 text-white rounded">
+          <button
+            disabled={loading}
+            className="ml-auto bg-amber-600 hover:bg-amber-700 text-white px-6 py-3 rounded-lg shadow"
+          >
             {loading ? "Saving..." : "Save Recipe"}
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }
